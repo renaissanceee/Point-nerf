@@ -339,12 +339,12 @@ class NerfSynth360FtDataset(BaseDataset):
         cam_xyz_lst = [c2w[:3,3] for c2w in self.cam2worlds]
         _, _, w2cs, c2ws = self.build_proj_mats(meta=self.testmeta, list=self.test_id_list)
         test_cam_xyz_lst = [c2w[:3,3] for c2w in c2ws]
-
         if self.split=="train":
             cam_xyz = np.stack(cam_xyz_lst, axis=0)
             test_cam_xyz = np.stack(test_cam_xyz_lst, axis=0)
-            triangles = data_utils.triangluation_bpa(cam_xyz, test_pnts=test_cam_xyz, full_comb=self.opt.full_comb>0)
-            self.view_id_list = [triangles[i] for i in range(len(triangles))]
+            triangles = data_utils.triangluation_bpa(cam_xyz, test_pnts=test_cam_xyz, full_comb=self.opt.full_comb>0)# [[ 0 79 24]...[79 96 59]] 543个三元组
+            self.view_id_list = [triangles[i] for i in range(len(triangles))]#triangles-->view_id_list
+            # not executed
             if self.opt.full_comb<0:
                 with open(f'../data/nerf_synth_configs/list/lego360_init_pairs.txt') as f:
                     for line in f:
@@ -381,7 +381,7 @@ class NerfSynth360FtDataset(BaseDataset):
         focal = 0.5 * 800 / np.tan(0.5 * self.meta['camera_angle_x'])  # original focal length
         focal *= self.img_wh[0] / 800  # modify focal length to match size self.img_wh
         self.focal = focal
-        self.near_far = np.array([2.0, 6.0])
+        self.near_far = np.array([2.0, 6.0]) #JJ
         for vid in list:
             frame = meta['frames'][vid]
             c2w = np.array(frame['transform_matrix']) @ self.blender2opencv
@@ -398,7 +398,8 @@ class NerfSynth360FtDataset(BaseDataset):
             proj_mat_l = np.eye(4)
             intrinsic[:2] = intrinsic[:2] / 4
             proj_mat_l[:3, :4] = intrinsic @ w2c[:3, :4]
-            proj_mats += [(proj_mat_l, self.near_far)]
+            proj_mats += [(proj_mat_l, self.near_far)]#JJ
+            # proj_mats += [proj_mat_l]
 
         proj_mats, intrinsics = np.stack(proj_mats), np.stack(intrinsics)
         world2cams, cam2worlds = np.stack(world2cams), np.stack(cam2worlds)
@@ -480,19 +481,23 @@ class NerfSynth360FtDataset(BaseDataset):
         sample = {}
         init_view_num = self.opt.init_view_num
         view_ids = self.view_id_list[idx]
+        # print(view_ids)#[ 0 79 24]
         if self.split == 'train':
             view_ids = view_ids[:init_view_num]
-
+            # print("init_view_num: ",init_view_num)# 3
+            # print("view_ids: ",view_ids)#[ 0 79 24]
         affine_mat, affine_mat_inv = [], []
         mvs_images, imgs, depths_h, alphas = [], [], [], []
         proj_mats, intrinsics, w2cs, c2ws, near_fars = [], [], [], [], []  # record proj mats between views
+        # print(view_ids)
         for i in view_ids:
             vid = self.view_id_dict[i]
             # mvs_images += [self.normalize_rgb(self.mvsimgs[vid])]
             # mvs_images += [self.render_gtimgs[vid]]
             mvs_images += [self.mvsimgs[vid]]
             imgs += [self.render_gtimgs[vid]]
-            proj_mat_ls, near_far = self.proj_mats[vid]
+            proj_mat_ls, near_far = self.proj_mats[vid]#JJ
+            # proj_mat_ls, near_far = self.proj_mats[vid], np.array([2.0, 6.0])
             intrinsics.append(self.intrinsics[vid])
             w2cs.append(self.world2cams[vid])
             c2ws.append(self.cam2worlds[vid])
@@ -560,7 +565,8 @@ class NerfSynth360FtDataset(BaseDataset):
         w2c = self.world2cams[id]
         c2w = self.cam2worlds[id]
         intrinsic = self.intrinsics[id]
-        proj_mat_ls, near_far = self.proj_mats[id]
+        # proj_mat_ls, near_far = self.proj_mats[id]#JJ
+        proj_mat_ls, near_far = self.proj_mats[id], np.array[2.0, 6.0]
 
         gt_image = np.transpose(img, (1,2,0))
         # print("gt_image", gt_image.shape)

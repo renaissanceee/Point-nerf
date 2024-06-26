@@ -1,24 +1,24 @@
-export PYTHONPATH=
-source /cluster/project/cvl/jiezcao/3dgs/bin/activate
+#!/bin/bash
 nrCheckpoint="../checkpoints"
-nrDataRoot="../data_src"
-name='hotdog_cuda'
+#nrDataRoot="../data_src"
+name='bicycle'
 
 resume_iter=best #
-save_point_freq=40
-data_root="${nrDataRoot}/nerf/nerf_synthetic/"
-scan="hotdog"
+data_root="/cluster/work/cvl/jiezcao/jiameng/3D-Gaussian/360_v2/"
+scan="bicycle"
 
 load_points=0
 feat_grad=1
 conf_grad=1
 dir_grad=1
 color_grad=1
-vox_res=320
+vox_res=640
 normview=0
 prune_thresh=0.1
 prune_iter=10001
 prune_max_iter=130000
+mvs_img_wh=" 1088 640 "
+img_wh=" 1088 640 "
 
 feedforward=0
 ref_vid=0
@@ -31,7 +31,7 @@ init_view_num=3
 pre_d_est="${nrCheckpoint}/MVSNet/model_000014.ckpt"
 manual_std_depth=0.0
 depth_conf_thresh=0.8
-geo_cnsst_num=5
+geo_cnsst_num=2
 full_comb=1
 appr_feature_str0="imgfeat_0_0123 dir_0 point_conf"
 point_conf_mode="1" # 0 for only at features, 1 for multi at weight
@@ -47,18 +47,19 @@ agg_axis_weight=" 1. 1. 1."
 agg_dist_pers=20
 radius_limit_scale=4
 depth_limit_scale=0
-alpha_range=0
-vscale=" 2 2 2 "
+alpha_range=1
+
+vscale=" 3 3 3 "
 kernel_size=" 3 3 3 "
 query_size=" 3 3 3 "
-vsize=" 0.004 0.004 0.004 " #" 0.005 0.005 0.005 "
-wcoord_query=-1
+vsize=" 0.003 0.003 0.003 " #" 0.005 0.005 0.005 "
+wcoord_query=1
 z_depth_dim=400
-max_o=1000000 #2000000
-ranges=" -1.198 -1.286 -0.190  1.198 1.110 0.312 "
-SR=80
+max_o=1500000 #2000000
+ranges=" -2.05965 -0.48064 -2.23660 1.78036 0.6094 1.28341 "
+SR=40
 K=8
-P=9 #120
+P=11
 NN=2
 
 
@@ -87,11 +88,11 @@ dist_xyz_deno=0
 
 
 raydist_mode_unit=1
-dataset_name='nerf_synth360_ft'
-pin_data_in_memory=1
+dataset_name='tt_ft'
+pin_data_in_memory=0
 model='mvs_points_volumetric'
-near_plane=2.0
-far_plane=6.0
+near_plane=0.0
+far_plane=4.5
 which_ray_generation='near_far_linear' #'nerf_near_far_linear' #
 domain_size='1'
 dir_norm=0
@@ -105,9 +106,10 @@ num_pos_freqs=10
 num_viewdir_freqs=4 #6
 
 random_sample='random'
+random_sample_size=48 #48 # 32 * 32 = 1024
 
-random_sample_size=60 #48 # 32 * 32 = 1024
 batch_size=1
+
 plr=0.002
 lr=0.0005 # 0.0005 #0.00015
 lr_policy="iter_exponential_decay"
@@ -115,7 +117,8 @@ lr_decay_iters=1000000
 lr_decay_exp=0.1
 
 gpu_ids='0'
-checkpoints_dir="${nrCheckpoint}/nerfsynth/"
+
+checkpoints_dir="${nrCheckpoint}/tanksntemples/"
 resume_dir="${nrCheckpoint}/init/dtu_dgt_d012_img0123_conf_agg2_32_dirclr20"
 
 save_iter_freq=10000
@@ -130,15 +133,15 @@ train_and_test=0 #1
 test_num=10
 test_freq=10000 #1200 #1200 #30184 #30184 #50000
 print_freq=40
-test_num_step=10
+test_num_step=3
 
-far_thresh=-1 #0.005
+far_thresh=0.009
 prob_freq=10001 #2000 #10001
 prob_num_step=20
 prob_thresh=0.7
 prob_mul=0.4
 prob_kernel_size=" 3 3 3 "
-prob_tiers=" 100000 "
+prob_tiers=" 90000 "
 
 zero_epsilon=1e-3
 
@@ -151,11 +154,9 @@ color_loss_weights=" 1.0 0.0 0.0 "
 color_loss_items='ray_masked_coarse_raycolor ray_miss_coarse_raycolor coarse_raycolor'
 test_color_loss_items='coarse_raycolor ray_miss_coarse_raycolor ray_masked_coarse_raycolor'
 
-vid=250000
+vid=220000
 
 bg_color="white" #"0.0,0.0,0.0,1.0,1.0,1.0"
-bg_filtering=1
-
 split="train"
 
 cd run
@@ -163,8 +164,7 @@ cd run
 #for i in $(seq 1 $prob_freq $maximum_step)
 #
 #do
-##python3 gen_pnts.py \
-python3 train_ft_nonstop.py \
+python3 train_ft.py \
         --experiment $name \
         --scan $scan \
         --data_root $data_root \
@@ -276,8 +276,11 @@ python3 train_ft_nonstop.py \
         --prob_mul $prob_mul \
         --prob_kernel_size $prob_kernel_size \
         --prob_tiers $prob_tiers \
+        --far_thresh $far_thresh \
         --alpha_range $alpha_range \
         --ranges $ranges \
+        --mvs_img_wh $mvs_img_wh \
+        --img_wh $img_wh \
         --vid $vid \
         --vsize $vsize \
         --wcoord_query $wcoord_query \
@@ -285,7 +288,6 @@ python3 train_ft_nonstop.py \
         --zero_one_loss_items $zero_one_loss_items \
         --zero_one_loss_weights $zero_one_loss_weights \
         --prune_max_iter $prune_max_iter \
-        --far_thresh $far_thresh \
-        --bg_filtering $bg_filtering
+        --debug
 
-#done
+done

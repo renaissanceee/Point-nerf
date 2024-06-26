@@ -81,8 +81,9 @@ def flip_z(poses):
 
 
 def triangluation_bpa(pnts, test_pnts=None, full_comb=False):
+    # print(pnts)#[[-3.96426296  0.18489811  0.70741105]...] 100个
     pcd = o3d.geometry.PointCloud()
-    pcd.points = o3d.utility.Vector3dVector(pnts[:, :3])
+    pcd.points = o3d.utility.Vector3dVector(pnts[:, :3])#(100, 3)
     pcd.normals = o3d.utility.Vector3dVector(pnts[:, :3] / np.linalg.norm(pnts[:, :3], axis=-1, keepdims=True))
 
     # pcd.colors = o3d.utility.Vector3dVector(pnts[:, 3:6] / 255)
@@ -91,8 +92,6 @@ def triangluation_bpa(pnts, test_pnts=None, full_comb=False):
 
     distances = pcd.compute_nearest_neighbor_distance()
     avg_dist = np.mean(distances)
-
-
     radius = 3 * avg_dist
     dec_mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_ball_pivoting(pcd, o3d.utility.DoubleVector(
         [radius, radius * 2]))
@@ -112,10 +111,11 @@ def triangluation_bpa(pnts, test_pnts=None, full_comb=False):
     #     tpcd.normals = o3d.utility.Vector3dVector(test_pnts[:, :3] / np.linalg.norm(test_pnts[:, :3], axis=-1, keepdims=True))
     #     o3d.visualization.draw_geometries([dec_mesh, tpcd] )
     triangles = np.asarray(dec_mesh.triangles, dtype=np.int32)
-    if full_comb:
+    if full_comb:#181*3 -> 543
         q, w, e = triangles[..., 0], triangles[..., 1], triangles[..., 2]
         triangles2 = np.stack([w,q,e], axis=-1)
         triangles3 = np.stack([e,q,w], axis=-1)
         triangles = np.concatenate([triangles, triangles2, triangles3], axis=0)
+    # print(len(triangles))#543
     return triangles
 

@@ -1,4 +1,5 @@
-#!/bin/bash
+export PYTHONPATH=
+source /cluster/project/cvl/jiezcao/3dgs/bin/activate
 nrCheckpoint="../checkpoints"
 nrDataRoot="../data_src"
 name='ship_cuda'
@@ -26,7 +27,8 @@ depth_occ=1
 depth_vid="0"
 trgt_id=0
 manual_depth_view=1
-init_view_num=3
+#init_view_num=3
+init_view_num=20
 pre_d_est="${nrCheckpoint}/MVSNet/model_000014.ckpt"
 manual_std_depth=0.0
 depth_conf_thresh=0.8
@@ -116,7 +118,7 @@ lr_policy="iter_exponential_decay"
 lr_decay_iters=1000000
 lr_decay_exp=0.1
 
-gpu_ids='3'
+gpu_ids='0'
 checkpoints_dir="${nrCheckpoint}/nerfsynth/"
 resume_dir="${nrCheckpoint}/init/dtu_dgt_d012_img0123_conf_agg2_32_dirclr20"
 
@@ -124,6 +126,7 @@ save_iter_freq=10000
 save_point_freq=10000 #301840 #1
 maximum_step=200000 #300000 #800000
 
+niter=10000 #1000000
 niter=10000 #1000000
 niter_decay=10000 #250000
 n_threads=1
@@ -166,7 +169,7 @@ cd run
 #
 #do
 ##python3 gen_pnts.py \
-python3 train_ft_nonstop.py \
+python train_ft_nonstop.py \
         --experiment $name \
         --scan $scan \
         --data_root $data_root \

@@ -1,6 +1,5 @@
 import os, torch, cv2, re
 import numpy as np
-
 from torch_scatter import scatter_min, segment_coo, scatter_mean
 from PIL import Image
 import torch.nn.functional as F

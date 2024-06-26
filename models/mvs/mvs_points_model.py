@@ -169,7 +169,7 @@ class MvsPointsModel(nn.Module):
 
 
     def depth2point(self, sampled_depth, ref_intrinsic, near_far):
-        B, N, C, H, W = sampled_depth.shape
+        B, N, C, H, W = sampled_depth.shape#[1, 1, 1, 800, 800]
         valid_z = sampled_depth
         valid_x = torch.arange(W, dtype=torch.float32, device=sampled_depth.device) / (W - 1)
         valid_y = torch.arange(H, dtype=torch.float32, device=sampled_depth.device) / (H - 1)
@@ -179,7 +179,7 @@ class MvsPointsModel(nn.Module):
         valid_y = valid_y[None, None, None, ...].expand(B, N, C, -1, -1)
         ndc_xyz = torch.stack([valid_x, valid_y, valid_z], dim=-1).view(B, N, C, H, W, 3)  # 1, 1, 5, 512, 640, 3
         cam_xyz = ndc_2_cam(ndc_xyz, near_far, ref_intrinsic, W, H) # 1, 1, 5, 512, 640, 3
-        return ndc_xyz, cam_xyz
+        return ndc_xyz, cam_xyz#[1,1,1,H,W,3]
 
 
     def prob_filter(self, thresh, num_neighbor, volume_prob, ndc_expected_depth, ndc_std_depth):
@@ -259,13 +259,15 @@ class MvsPointsModel(nn.Module):
         return points_embedding, points_colors, points_dirs, points_conf
 
 
-    def gen_points(self, batch):
+    def gen_points(self, batch):# replace depth_map to unidepth
         if 'scan' in batch.keys():
             batch.pop('scan')
         log, loss = {},0
         data_mvs, pose_ref = self.decode_batch(batch)
+        # import pdb;pdb.set_trace()
         imgs, proj_mats = data_mvs['images'], data_mvs['proj_mats']
         near_fars, depths_h = data_mvs['near_fars'], data_mvs['depths_h'] if 'depths_h' in data_mvs else None
+        # depths_h=[1,3,1,800,800]: all-zero
         # print("depths_h", batch["near_fars"], depths_h.shape, depths_h[0,0,:,:])
         # volume_feature:(1, 8, D, 176, 208)       img_feat:(B, V, C, h, w)
         cam_expected_depth = None
@@ -299,7 +301,7 @@ class MvsPointsModel(nn.Module):
         else:
             near_far_depth = batch["near_fars_depth"][0]
             depth_interval, depth_min = (near_far_depth[1] - near_far_depth[0]) / 192., near_far_depth[0]
-            depth_values = (depth_min + torch.arange(0, 192, device="cuda", dtype=torch.float32) * depth_interval)[None, :]
+            depth_values = (depth_min + torch.arange(0, 192, device="cuda", dtype=torch.float32) * depth_interval)[None, :]# tensor[1, 192]
             dimgs = batch["mvs_images"] if "mvs_images" in batch else imgs
             bmvs_2d_features=None
             # print("dimgs",dimgs.shape)
@@ -311,7 +313,8 @@ class MvsPointsModel(nn.Module):
             if self.args.manual_depth_view == 1:
                 with torch.no_grad():
                     # 1, 128, 160;  1, 128, 160; prob_volume: 1, 192, 128, 160
-                    depths_h, photometric_confidence, _, _ = self.MVSNet(bimgs, bproj_mats, bdepth_values, features=bmvs_2d_features)
+                    depths_h, photometric_confidence, _, _ = self.MVSNet(bimgs, bproj_mats, bdepth_values, features=bmvs_2d_features)#[1,3,3,800,800] [1,3,3,4] [1,192]
+                    #JJ:depths_h[1,3,1,800,800]->[1,200,200]
                     depths_h, photometric_confidence = depths_h[:,None,...], photometric_confidence[:,None,...]
                 # B,N,H,W,3,    B,N,H,W,3,      1,      1,1,H,W
             else:
@@ -326,17 +329,18 @@ class MvsPointsModel(nn.Module):
 
                     depths_h = torch.cat([depth_values[0,topk_idx[i].view(-1)].view(1, dnum, prob_volume.shape[-2], prob_volume.shape[-1]) for i in range(len(depth_vid))], dim=0)
 
-            bcam_expected_depth = torch.nn.functional.interpolate(depths_h, size=list(dimgs.shape)[-2:], mode='nearest')
+            bcam_expected_depth = torch.nn.functional.interpolate(depths_h, size=list(dimgs.shape)[-2:], mode='nearest')#[1,200,200]->[1,1,800,800]
 
             photometric_confidence = torch.nn.functional.interpolate(photometric_confidence, size=list(dimgs.shape)[-2:], mode='nearest')  # 1, 1, H, W
             photometric_confidence_lst = torch.unbind(photometric_confidence[:,None,...], dim=0)
             bndc_std_depth = torch.ones_like(bcam_expected_depth) * self.args.manual_std_depth
             for i in range(len(depth_vid)):
                 vid = depth_vid[i]
-                cam_expected_depth, ndc_std_depth = bcam_expected_depth[i:i+1], bndc_std_depth[i:i+1]
+                cam_expected_depth, ndc_std_depth = bcam_expected_depth[i:i+1], bndc_std_depth[i:i+1]#[1, 1, 800, 800]
                 ndc_xyz, cam_xyz, HDWD, nearfar_mask = self.sample_func(volume_prob, self.args, batch["intrinsics"][:, vid,...], near_fars[0, vid], cam_expected_depth=cam_expected_depth, ndc_std_depth=ndc_std_depth)
+                # self.sample_func: MvsPointsModel.gau_single_sampler
                 if cam_xyz.shape[1] > 0:
-                    cam_xyz_lst.append(cam_xyz)
+                    cam_xyz_lst.append(cam_xyz)#[1, 1, 1, 800, 800, 3]->list
                     nearfar_mask_lst.append(nearfar_mask)
         return cam_xyz_lst, photometric_confidence_lst, nearfar_mask_lst, HDWD, data_mvs, [batch["intrinsics"][:,int(vid),...] for vid in self.args.depth_vid], [batch["w2cs"][:,int(vid),...] for vid in self.args.depth_vid]
 

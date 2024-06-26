@@ -2,6 +2,7 @@ import sys
 import os
 import pathlib
 sys.path.append(os.path.join(pathlib.Path(__file__).parent.absolute(), '..'))
+# sys.path.append('/cluster/work/cvl/jiezcao/jiameng/pointnerf/')
 import glob
 import copy
 import torch
@@ -66,8 +67,8 @@ def gen_points_filter_embeddings(dataset, visualizer, opt):
     near_fars_all = []
     gpu_filter = True
     cpu2gpu= len(dataset.view_id_list) > 300
-
     imgs_lst, HDWD_lst, c2ws_lst, w2cs_lst, intrinsics_lst = [],[],[],[],[]
+    #dataset.view_id_list: 543个三元组：三视角
     with torch.no_grad():
         for i in tqdm(range(0, len(dataset.view_id_list))):
             data = dataset.get_init_item(i)
@@ -95,7 +96,12 @@ def gen_points_filter_embeddings(dataset, visualizer, opt):
         torch.cuda.empty_cache()
         if opt.manual_depth_view != 0:
             if gpu_filter:
+                # print("cam_xyz_all[0]: ", cam_xyz_all[0].size())  #543个 [1,1,1,800,800,3]
                 _, xyz_world_all, confidence_filtered_all = filter_utils.filter_by_masks_gpu(cam_xyz_all, intrinsics_all, extrinsics_all, confidence_all, points_mask_all, opt, vis=True, return_w=True, cpu2gpu=cpu2gpu, near_fars_all=near_fars_all)
+                # print("xyz_world_all length:", len(xyz_world_all))  # 543个[xxxxxx,3]
+                # print("xyz_world_all[0]:",len(xyz_world_all[i]))# 105067
+                # print("xyz_world_all[0]:", xyz_world_all[i][i])# (x,y,z) e.g.tensor([0.2869, 0.1221, 0.7254])
+                # #543组匹配->每组生成[num,3]->最终拼成[91474737,3]
             else:
                 _, xyz_world_all, confidence_filtered_all = filter_utils.filter_by_masks(cam_xyz_all, [intr.cpu().numpy() for intr in intrinsics_all], extrinsics_all, confidence_all, points_mask_all, opt)
             # print(xyz_ref_lst[0].shape) # 224909, 3
@@ -104,9 +110,9 @@ def gen_points_filter_embeddings(dataset, visualizer, opt):
             xyz_world_all = [np.matmul(np.concatenate([cam_xyz_all[i], np.ones_like(cam_xyz_all[i][..., 0:1])], axis=-1), np.transpose(np.linalg.inv(extrinsics_all[i][0,...])))[:, :3] for i in range(len(cam_xyz_all))]
             xyz_world_all, cam_xyz_all, confidence_filtered_all = filter_by_masks.range_mask_lst_np(xyz_world_all, cam_xyz_all, confidence_filtered_all, opt)
             del cam_xyz_all
+        ## 分别存储543个点云文件
         # for i in range(len(xyz_world_all)):
         #     visualizer.save_neural_points(i, torch.as_tensor(xyz_world_all[i], device="cuda", dtype=torch.float32), None, data, save_ref=opt.load_points==0)
-        # exit()
         # xyz_world_all = xyz_world_all.cuda()
         # confidence_filtered_all = confidence_filtered_all.cuda()
         points_vid = torch.cat([torch.ones_like(xyz_world_all[i][...,0:1]) * i for i in range(len(xyz_world_all))], dim=0)
@@ -116,8 +122,62 @@ def gen_points_filter_embeddings(dataset, visualizer, opt):
         print("xyz_world_all", xyz_world_all.shape, points_vid.shape, confidence_filtered_all.shape)
         torch.cuda.empty_cache()
         # visualizer.save_neural_points(0, xyz_world_all, None, None, save_ref=False)
-        # print("vis 0")
+        ####################--->for 3DGS
+        # folder = "/cluster/work/cvl/jiezcao/jiameng/Adaptive-GS/dense_init/ship_points_"
+        # folder = "/cluster/work/cvl/jiezcao/jiameng/Adaptive-GS/dense_init/lego_points_"
+        folder = "/cluster/work/cvl/jiezcao/jiameng/Adaptive-GS/dense_init/hotdog_points_"
+        import open3d as o3d
+        num_points = xyz_world_all.shape[0]
 
+        rate = 0.0005
+        num_samples = int( rate * num_points)
+        print("num of pcd: ",num_samples)# 83061
+        sampled_indices = torch.randint(0, num_points, (num_samples,))
+        sampled_points = xyz_world_all[sampled_indices]
+        sampled_points = sampled_points.numpy().astype(np.float32)
+        print("sampled_points.shape: ",sampled_points.shape)
+        pcd = o3d.geometry.PointCloud()
+        pcd.points = o3d.utility.Vector3dVector(sampled_points)
+        o3d.io.write_point_cloud(folder+"0005.ply", pcd)
+
+
+        rate = 0.001 #0.0005
+        num_samples = int( rate * num_points)
+        print("num of pcd: ",num_samples)# 83061
+        sampled_indices = torch.randint(0, num_points, (num_samples,))
+        sampled_points = xyz_world_all[sampled_indices]
+        sampled_points = sampled_points.numpy().astype(np.float32)
+        print("sampled_points.shape: ",sampled_points.shape)
+        pcd = o3d.geometry.PointCloud()
+        pcd.points = o3d.utility.Vector3dVector(sampled_points)
+        o3d.io.write_point_cloud(folder+"001.ply", pcd)
+
+        rate = 0.002 #0.0005
+        num_samples = int( rate * num_points)
+        print("num of pcd: ",num_samples)# 83061
+        sampled_indices = torch.randint(0, num_points, (num_samples,))
+        sampled_points = xyz_world_all[sampled_indices]
+        sampled_points = sampled_points.numpy().astype(np.float32)
+        print("sampled_points.shape: ",sampled_points.shape)
+        pcd = o3d.geometry.PointCloud()
+        pcd.points = o3d.utility.Vector3dVector(sampled_points)
+        o3d.io.write_point_cloud(folder+"002.ply", pcd)
+
+        rate = 0.005
+        num_samples = int( rate * num_points)
+        print("num of pcd: ",num_samples)# 83061
+        sampled_indices = torch.randint(0, num_points, (num_samples,))
+        sampled_points = xyz_world_all[sampled_indices]
+        sampled_points = sampled_points.numpy().astype(np.float32)
+        print("sampled_points.shape: ",sampled_points.shape)
+        pcd = o3d.geometry.PointCloud()
+        pcd.points = o3d.utility.Vector3dVector(sampled_points)
+        o3d.io.write_point_cloud(folder+"005.ply", pcd)
+        asd
+        ####################
+
+        # print("vis 0")
+        
         print("%%%%%%%%%%%%%  getattr(dataset, spacemin, None)", getattr(dataset, "spacemin", None))
         if getattr(dataset, "spacemin", None) is not None:
             mask = (xyz_world_all - dataset.spacemin[None, ...].to(xyz_world_all.device)) >= 0
@@ -134,10 +194,9 @@ def gen_points_filter_embeddings(dataset, visualizer, opt):
             print("alpha masking xyz_world_all", xyz_world_all.shape, points_vid.shape)
         # visualizer.save_neural_points(100, xyz_world_all, None, data, save_ref=opt.load_points == 0)
         # print("vis 100")
-
         if opt.vox_res > 0:
             xyz_world_all, sparse_grid_idx, sampled_pnt_idx = mvs_utils.construct_vox_points_closest(xyz_world_all.cuda() if len(xyz_world_all) < 99999999 else xyz_world_all[::(len(xyz_world_all)//99999999+1),...].cuda(), opt.vox_res)
-            points_vid = points_vid[sampled_pnt_idx,:]
+            points_vid = points_vid[sampled_pnt_idx,:]# RuntimeError: indices should be either on cpu or on the same device as the indexed tensor (cpu)
             confidence_filtered_all = confidence_filtered_all[sampled_pnt_idx]
             print("after voxelize:", xyz_world_all.shape, points_vid.shape)
             xyz_world_all = xyz_world_all.cuda()
@@ -146,7 +205,9 @@ def gen_points_filter_embeddings(dataset, visualizer, opt):
         confidence_filtered_all = [confidence_filtered_all[points_vid[:,0]==i] for i in range(len(HDWD_lst))]
         cam_xyz_all = [(torch.cat([xyz_world_all[i], torch.ones_like(xyz_world_all[i][...,0:1])], dim=-1) @ extrinsics_all[i][0].t())[...,:3] for i in range(len(HDWD_lst))]
         points_embedding_all, points_color_all, points_dir_all, points_conf_all = [], [], [], []
-        for i in tqdm(range(len(HDWD_lst))):
+        # for i in tqdm(range(len(HDWD_lst))):# error: device of cpu...
+        # import pdb;pdb.set_trace()
+        for i in range(len(HDWD_lst)):
             if len(xyz_world_all[i]) > 0:
                 embedding, color, dir, conf = model.query_embedding(HDWD_lst[i], torch.as_tensor(cam_xyz_all[i][None, ...], device="cuda", dtype=torch.float32), torch.as_tensor(confidence_filtered_all[i][None, :, None], device="cuda", dtype=torch.float32) if len(confidence_filtered_all) > 0 else None, imgs_lst[i].cuda(), c2ws_lst[i], w2cs_lst[i], intrinsics_full_lst[i], 0, pointdir_w=True)
                 points_embedding_all.append(embedding)
@@ -593,6 +654,8 @@ def main():
             fmt.END)
     visualizer = Visualizer(opt)
     train_dataset = create_dataset(opt)
+    # print(opt.dataset_name)#nerf_synth360_ft
+    
     normRw2c = train_dataset.norm_w2c[:3,:3] # torch.eye(3, device="cuda") #
     img_lst=None
     best_PSNR=0.0
@@ -633,6 +696,7 @@ def main():
             opt.is_train=True
             model = create_model(opt)
         elif opt.load_points < 1:
+            # JJ
             points_xyz_all, points_embedding_all, points_color_all, points_dir_all, points_conf_all, img_lst, c2ws_lst, w2cs_lst, intrinsics_all, HDWD_lst = gen_points_filter_embeddings(train_dataset, visualizer, opt)
             opt.resume_iter = opt.resume_iter if opt.resume_iter != "latest" else get_latest_epoch(opt.resume_dir)
             opt.is_train=True

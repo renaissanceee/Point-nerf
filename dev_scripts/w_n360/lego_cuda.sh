@@ -1,10 +1,10 @@
-#!/bin/bash
+export PYTHONPATH=
+source /cluster/project/cvl/jiezcao/3dgs/bin/activate
 nrCheckpoint="../checkpoints"
 nrDataRoot="../data_src"
 name='lego_cuda'
 
 resume_iter=best #
-save_point_freq=40
 
 data_root="${nrDataRoot}/nerf/nerf_synthetic/"
 scan="lego"
@@ -166,10 +166,8 @@ cd run
 #
 #do
 #python3 gen_pnts.py \
-python train_ft_nonstop.py \
-        --experiment $name \
-        --scan $scan \
-        --data_root $data_root \
+python train_ft_nonstop.py --experiment $name \
+        --scan $scan --data_root $data_root \
         --dataset_name $dataset_name \
         --model $model \
         --which_render_func $which_render_func \
